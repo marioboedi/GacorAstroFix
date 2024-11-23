@@ -1,16 +1,22 @@
-const jwt = require('jsonwebtoken');
+// backend/middleware/auth.js
 
-const auth = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Tambahkan data user ke request
-    next();
-  } catch (error) {
-    res.status(401).json({ message: "Invalid Token" });
+module.exports.isAuthenticated = (req, res, next) => {
+  console.log('Middleware isAuthenticated dijalankan');
+  console.log('Session UserID:', req.session.userId); // Debug sesi
+  if (req.session.userId) {
+    return next(); // Jika sudah login, lanjutkan
   }
+  console.log('Pengguna belum login, redirect ke /login');
+  return res.redirect('/login'); // Jika belum login, arahkan ke login
 };
 
-module.exports = auth;
+module.exports.isNotAuthenticated = (req, res, next) => {
+  console.log('Middleware isNotAuthenticated dijalankan');
+  console.log('Session UserID:', req.session.userId); // Debug sesi
+  if (req.session.userId) {
+    console.log('Pengguna sudah login, redirect ke /');
+    return res.redirect('/'); // Jika sudah login, arahkan ke halaman utama
+  }
+  console.log('Pengguna belum login, lanjutkan ke halaman');
+  return next(); // Jika belum login, lanjutkan
+};

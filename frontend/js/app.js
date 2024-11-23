@@ -1,1 +1,1 @@
-const app = angular.module('GacorAstroApp', []);
+var app = angular.module('GacorAstroApp', []);
