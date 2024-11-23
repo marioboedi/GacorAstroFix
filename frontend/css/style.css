@@ -1,0 +1,89 @@
+.hero img{
+    width: 100%;
+    padding-top: 2rem;
+    margin-left: 2rem;
+    border-radius: 50%;
+    animation: rotate-shadow 5s infinite linear;
+}
+
+@keyframes rotate-shadow {
+    0% {
+        box-shadow: 0px 4px 15px rgba(128, 0, 128, 0.5), 0px 0px 25px rgba(148, 0, 211, 0.3);
+    }
+    25% {
+        box-shadow: 20px 20px 25px rgba(128, 0, 128, 0.6), -20px -20px 35px rgba(148, 0, 211, 0.4);
+    }
+    50% {
+        box-shadow: 0px 4px 40px rgba(128, 0, 128, 0.7), 0px 0px 45px rgba(148, 0, 211, 0.5);
+    }
+    75% {
+        box-shadow: -20px -20px 35px rgba(128, 0, 128, 0.6), 20px 20px 25px rgba(148, 0, 211, 0.4);
+    }
+    100% {
+        box-shadow: 0px 4px 15px rgba(128, 0, 128, 0.5), 0px 0px 25px rgba(148, 0, 211, 0.3);
+    }
+}
+
+
+.hero{
+    padding-top: 30px;
+    padding-bottom: 50px;
+    background-color: black;
+    color: white;
+}
+
+.hero-box .box h1{
+    width: 100%;
+}
+
+.box h1{
+      font-family: "Josefin Sans", sans-serif;
+
+}
+
+.box h4{
+      font-family: "Josefin Sans", sans-serif;
+
+    font-size: 1.1rem;
+    width: 100%;
+}
+
+.hero .box span{
+    font-family: HipHop;
+    color: rgb(207, 6, 6);
+    text-shadow: 2px 2px 10px rgb(161, 10, 10);;
+}
+
+@media (max-width: 1440px){
+
+    .hero{
+        padding-top: 9rem;
+    }
+
+    
+}
+
+@media (max-width: 992px){
+
+    .hero{
+        padding-top: 9rem;
+    }
+
+    .box h4{
+          font-family: "Josefin Sans", sans-serif;
+
+        font-size: 1rem;
+        width: 100%;
+    }
+    
+}
+
+@media (max-width: 768px){
+
+    .hero{
+        padding-top: 9rem;
+    }
+    .hero-box{
+        text-align: center;
+    }
+}
