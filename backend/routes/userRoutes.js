@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, logout, updateUser, deleteUser } = require('../controllers/userController');
+const { register, login, logout, updateUser, deleteUser, getCurrentUser  } = require('../controllers/userController');
 const { isAuthenticated } = require("../middleware/auth");
 
 
@@ -18,6 +18,7 @@ router.put("/update", isAuthenticated, updateUser);
 
 router.delete("/delete", isAuthenticated, deleteUser);
 
+router.get('/current', isAuthenticated, getCurrentUser);
 
 
 module.exports = router;
