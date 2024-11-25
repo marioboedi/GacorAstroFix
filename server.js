@@ -17,7 +17,7 @@ app.use(
   session({
     secret: 'your_secret_key',
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: { 
         secure: false,
         maxAge: 1000 * 60 * 30, 
@@ -34,29 +34,41 @@ app.use('/api/users', userRoutes);
 // Halaman index (hanya untuk pengguna yang sudah login)
 app.get('/', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-  });
+});
   
-  app.get('/login', isNotAuthenticated, (req, res) => {
+app.get('/login', isNotAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'views', 'login.html'));
-  });
+});
   
-  app.get('/register', isNotAuthenticated, (req, res) => {
+app.get('/register', isNotAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'views', 'register.html'));
-  });
+});
+
+app.get("/account", isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "views", "account.html"));
+});
+  
 
 // Logout
+// Rute POST untuk logout
 app.post('/user/logout', (req, res) => {
-    console.log('Logout attempt'); // Debug
     req.session.destroy((err) => {
       if (err) {
-        console.log('Logout gagal:', err); // Debug error
+        console.log('Error saat logout:', err);
         return res.status(500).json({ message: 'Logout failed' });
       }
+  
+      res.clearCookie('connect.sid', {
+        path: '/', 
+        httpOnly: true, 
+        secure: false, 
+      }); // Hapus cookie sesi
+  
       console.log('Logout berhasil, sesi dihancurkan');
-      res.clearCookie('connect.sid'); // Hapus cookie sesi
-      return res.redirect('/login'); // Arahkan ke login
+      res.status(200).json({ message: 'Logged out successfully' });
     });
   });
+  
   
 
 // Jalankan server

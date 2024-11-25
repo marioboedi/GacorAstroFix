@@ -45,3 +45,59 @@ exports.logout = (req, res) => {
     });
 };
 
+
+exports.updateUser = async (req, res) => {
+  const { username, email } = req.body;
+  const userId = req.session.userId;
+
+  if (!username || !email) {
+    return res.status(400).json({ message: 'Username and email are required' });
+  }
+
+  try {
+    // Update langsung menggunakan findOneAndUpdate
+    const user = await User.findOneAndUpdate(
+      { _id: userId },
+      { username, email },
+      { new: true } // Mengembalikan data pengguna yang telah diperbarui
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Mengembalikan respon sukses
+    res.status(200).json({ message: 'User updated successfully', user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error updating user' });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  const userId = req.session.userId;
+
+  console.log("Session UserID untuk delete:", userId);
+
+  if (!userId) {
+    return res.status(401).json({ message: "User not authenticated" });
+  }
+
+  try {
+    const deletedUser = await User.findByIdAndDelete(userId);
+    if (!deletedUser) {
+      console.log("User tidak ditemukan untuk delete");
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("User berhasil dihapus:", deletedUser);
+
+    req.session.destroy();
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Error saat menghapus user:", err);
+    res.status(500).json({ message: "Error deleting user" });
+  }
+};
+
+
