@@ -47,30 +47,35 @@ exports.logout = (req, res) => {
 
 
 exports.updateUser = async (req, res) => {
-  const { username, email } = req.body;
   const userId = req.session.userId;
 
-  if (!username || !email) {
-    return res.status(400).json({ message: 'Username and email are required' });
+  if (!userId) {
+    return res.status(401).json({ message: "User not authenticated" });
+  }
+
+  const updates = {};
+  if (req.body.username) updates.username = req.body.username; // Tambahkan jika username dikirim
+  if (req.body.email) updates.email = req.body.email;         // Tambahkan jika email dikirim
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
   }
 
   try {
-    // Update langsung menggunakan findOneAndUpdate
     const user = await User.findOneAndUpdate(
       { _id: userId },
-      { username, email },
-      { new: true } // Mengembalikan data pengguna yang telah diperbarui
+      updates,
+      { new: true } // Mengembalikan data terbaru setelah update
     );
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Mengembalikan respon sukses
-    res.status(200).json({ message: 'User updated successfully', user });
+    res.status(200).json({ message: "User updated successfully", user });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Error updating user' });
+    res.status(500).json({ message: "Error updating user" });
   }
 };
 

@@ -3,19 +3,53 @@ app.controller("AccountController", function ($scope, $http, $window) {
   
     // Update akun pengguna
     $scope.updateAccount = function () {
-      console.log("Data yang akan diupdate:", $scope.user); // Debugging
-  
-      $http
-        .put("/api/users/update", $scope.user)
-        .then(function (response) {
-          alert("Account updated successfully!");
-          // Bisa lakukan redirect atau update UI dengan data baru
-        })
-        .catch(function (error) {
-          console.error(error);
-          alert("Failed to update account.");
-        });
-    };
+        const dataToUpdate = {};
+      
+        // Hanya tambahkan field yang diisi
+        if ($scope.user.username) {
+          dataToUpdate.username = $scope.user.username;
+        }
+        if ($scope.user.email) {
+          dataToUpdate.email = $scope.user.email;
+        }
+      
+        console.log("Data yang akan diupdate:", dataToUpdate); // Debugging
+      
+        // Kirim permintaan hanya jika ada data yang diupdate
+        if (Object.keys(dataToUpdate).length === 0) {
+          alert("No fields to update.");
+          return;
+        }
+      
+        $http
+          .put("/api/users/update", dataToUpdate)
+          .then(function (response) {
+            alert("Account updated successfully!");
+            $window.location.href = "/"; // Arahkan ke halaman index
+          })
+          .catch(function (error) {
+            console.error(error);
+            alert("Failed to update account.");
+          });
+      };
+      
+
+    $scope.loadUser = function () {
+        $http
+          .get("/api/users/current")
+          .then(function (response) {
+            $scope.user = response.data.user; // Ambil data user
+          })
+          .catch(function (error) {
+            console.error("Error fetching user data:", error);
+            alert("Failed to load user data.");
+          });
+      };
+      
+      // Panggil fungsi saat controller dimuat
+      $scope.loadUser();
+      
+      
   
     // Hapus akun pengguna
     $scope.deleteAccount = function () {
