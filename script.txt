@@ -1,0 +1,641 @@
+https://chatgpt.com/share/6744aaf2-20b0-8006-9fee-92e9cac12717
+
+https://chatgpt.com/share/67460edb-ea1c-8005-9fab-3ebffb089c84
+
+File db.js
+
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+
+    console.log('MongoDB Connected');
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error.message);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+
+
+File userController.js
+
+const User = require('../models/User');
+const bcrypt = require('bcrypt');
+
+exports.register = async (req, res) => {
+  const { username, password, email } = req.body;
+  try {
+    const userExists = await User.findOne({ username });
+    if (userExists) return res.status(400).json({ message: 'Username already exists' });
+
+    const newUser = new User({ username, password, email });
+    await newUser.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.login = async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ message: 'Invalid username or password' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid username or password' });
+
+    // Simpan sesi
+    req.session.userId = user._id;
+
+    res.status(200).json({ message: 'Login successful' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// backend/controllers/userController.js
+exports.logout = (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ message: 'Logout failed' });
+        }
+        res.clearCookie('connect.sid');
+        res.status(200).json({ message: 'Logged out successfully' });
+    });
+};
+
+
+exports.updateUser = async (req, res) => {
+  const userId = req.session.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: "User not authenticated" });
+  }
+
+  const updates = {};
+  if (req.body.username) updates.username = req.body.username; // Tambahkan jika username dikirim
+  if (req.body.email) updates.email = req.body.email;         // Tambahkan jika email dikirim
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { _id: userId },
+      updates,
+      { new: true } // Mengembalikan data terbaru setelah update
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "User updated successfully", user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error updating user" });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  const userId = req.session.userId;
+
+  console.log("Session UserID untuk delete:", userId);
+
+  if (!userId) {
+    return res.status(401).json({ message: "User not authenticated" });
+  }
+
+  try {
+    const deletedUser = await User.findByIdAndDelete(userId);
+    if (!deletedUser) {
+      console.log("User tidak ditemukan untuk delete");
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("User berhasil dihapus:", deletedUser);
+
+    req.session.destroy();
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Error saat menghapus user:", err);
+    res.status(500).json({ message: "Error deleting user" });
+  }
+};
+
+
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const userId = req.session.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const user = await User.findById(userId).select("username email"); // Mengambil username dan email
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ user });
+  } catch (err) {
+    console.error("Error fetching user data:", err);
+    res.status(500).json({ message: "Error fetching user data" });
+  }
+};
+
+
+File auth.js
+
+// backend/middleware/auth.js
+
+// Middleware untuk memastikan pengguna sudah login
+module.exports.isAuthenticated = (req, res, next) => {
+  console.log('Middleware isAuthenticated dijalankan');
+  console.log('Session UserID:', req.session ? req.session.userId : 'Tidak ada sesi');
+  
+  if (req.session && req.session.userId) {
+    console.log('Pengguna sudah login, lanjutkan ke halaman');
+    return next();
+  }
+  
+  console.log('Pengguna belum login, arahkan ke halaman login');
+  return res.redirect('/login'); // Jika belum login, arahkan ke halaman login
+};
+
+// Middleware untuk memastikan pengguna belum login
+module.exports.isNotAuthenticated = (req, res, next) => {
+  console.log('Middleware isNotAuthenticated dijalankan');
+  console.log('Session UserID:', req.session ? req.session.userId : 'Tidak ada sesi');
+  
+  if (req.session && req.session.userId) {
+    console.log('Pengguna sudah login, arahkan ke halaman utama');
+    return res.redirect('/'); // Jika sudah login, arahkan ke halaman utama
+  }
+  
+  console.log('Pengguna belum login, lanjutkan ke halaman');
+  return next(); // Jika belum login, lanjutkan ke rute berikutnya
+};
+
+
+File User.js
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+});
+
+// Hash password sebelum menyimpan
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+module.exports = mongoose.model('User', userSchema);
+
+
+File userRoutes.js
+
+const express = require('express');
+const { register, login, logout, updateUser, deleteUser, getCurrentUser  } = require('../controllers/userController');
+const { isAuthenticated } = require("../middleware/auth");
+
+
+const router = express.Router();
+
+// Rute Registrasi
+router.post('/register', register);
+
+// Rute Login
+router.post('/login', login);
+
+// Rute Logout
+router.post('/logout', logout);
+
+router.put("/update", isAuthenticated, updateUser);
+
+router.delete("/delete", isAuthenticated, deleteUser);
+
+router.get('/current', isAuthenticated, getCurrentUser);
+
+
+module.exports = router;
+
+
+File js/accountController.js
+
+app.controller("AccountController", function ($scope, $http, $window) {
+    $scope.user = {};
+  
+    // Update akun pengguna
+    $scope.updateAccount = function () {
+        const dataToUpdate = {};
+      
+        // Hanya tambahkan field yang diisi
+        if ($scope.user.username) {
+          dataToUpdate.username = $scope.user.username;
+        }
+        if ($scope.user.email) {
+          dataToUpdate.email = $scope.user.email;
+        }
+      
+        console.log("Data yang akan diupdate:", dataToUpdate); // Debugging
+      
+        // Kirim permintaan hanya jika ada data yang diupdate
+        if (Object.keys(dataToUpdate).length === 0) {
+          alert("No fields to update.");
+          return;
+        }
+      
+        $http
+          .put("/api/users/update", dataToUpdate)
+          .then(function (response) {
+            alert("Account updated successfully!");
+            $window.location.href = "/"; // Arahkan ke halaman index
+          })
+          .catch(function (error) {
+            console.error(error);
+            alert("Failed to update account.");
+          });
+      };
+      
+
+    $scope.loadUser = function () {
+        $http
+          .get("/api/users/current")
+          .then(function (response) {
+            $scope.user = response.data.user; // Ambil data user
+          })
+          .catch(function (error) {
+            console.error("Error fetching user data:", error);
+            alert("Failed to load user data.");
+          });
+      };
+      
+      // Panggil fungsi saat controller dimuat
+      $scope.loadUser();
+      
+      
+  
+    // Hapus akun pengguna
+    $scope.deleteAccount = function () {
+      if (!confirm("Are you sure you want to delete your account?")) return;
+  
+      $http
+        .delete("/api/users/delete")
+        .then(function (response) {
+          alert("Account deleted successfully!");
+          $window.location.href = "/login";
+        })
+        .catch(function (error) {
+          console.error(error);
+          alert("Failed to delete account.");
+        });
+    };
+  
+    // Logout pengguna
+    $scope.logout = function () {
+      $http
+        .post("/user/logout")
+        .then(function (response) {
+          alert("Logged out successfully!");
+          $window.location.href = "/login";
+        })
+        .catch(function (error) {
+          console.error(error);
+          alert("Failed to log out.");
+        });
+    };
+  });
+  
+  File js/app.js
+
+  var app = angular.module('GacorAstroApp', []);
+
+
+File js/loginController.js
+
+app.controller('LoginController', function ($scope, $http) {
+    $scope.credentials = {};
+  
+    $scope.login = function () {
+      $http
+        .post('/api/users/login', $scope.credentials)
+        .then((response) => {
+          alert(response.data.message);
+          window.location.href = '/';
+        })
+        .catch((error) => {
+          alert(error.data.message || 'Login failed');
+        });
+    };
+  });
+  
+
+  File js/logoutController.js
+
+// frontend/js/mainController.js
+app.controller('LogoutController', function($scope, $http, $window) {
+    // Fungsi logout
+    $scope.logout = function() {
+      // Panggil rute logout di backend
+      $http.post('/api/users/logout')
+        .then(function(response) {
+          if (response.data.message === 'Logged out successfully') {
+            // Jika logout berhasil, arahkan ke halaman login
+             $window.location.href = '/login';  // Atau bisa dengan '/login.html' tergantung rute
+          }
+        }, function(error) {
+          alert('Logout error: ' + error.data);
+        });
+    };
+  });
+  
+
+  File mainController.js
+
+  app.controller('MainController', function ($scope, $http) {
+    // Ambil data pengguna yang login
+    $http.get('/api/users/current').then(
+      function (response) {
+        $scope.username = response.data.user.username; // Simpan username di scope
+      },
+      function (error) {
+        console.error('Error fetching user data:', error);
+        $scope.username = 'Guest'; // Default jika tidak ada pengguna
+      }
+    );
+  });
+
+  File registerController.js
+
+  app.controller('RegisterController', function ($scope, $http) {
+    $scope.user = {};
+  
+    $scope.register = function () {
+      $http
+        .post('/api/users/register', $scope.user)
+        .then((response) => {
+          alert(response.data.message);
+          window.location.href = '/login';
+        })
+        .catch((error) => {
+          alert(error.data.message || 'Registration failed');
+        });
+    };
+  });
+
+
+File login.html
+
+<!DOCTYPE html>
+<html lang="en" ng-app="GacorAstroApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../js/loginController.js"></script>
+</head>
+<body>
+  <h1>Login</h1>
+  <form ng-controller="LoginController" ng-submit="login()" novalidate>
+    <input type="text" ng-model="credentials.username" placeholder="Username" required />
+    <input type="password" ng-model="credentials.password" placeholder="Password" required />
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
+
+
+File register.html
+
+<!DOCTYPE html>
+<html lang="en" ng-app="GacorAstroApp">
+<head>
+  <meta charset="UTF-8">
+  <title>Register</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="../js/app.js"></script>
+  <script src="../js/registerController.js"></script>
+</head>
+<body>
+  <h1>Register</h1>
+  <form ng-controller="RegisterController" ng-submit="register()" novalidate>
+    <input type="text" ng-model="user.username" placeholder="Username" required />
+    <input type="email" ng-model="user.email" placeholder="Email" required />
+    <input type="password" ng-model="user.password" placeholder="Password" required />
+    <button type="submit">Register</button>
+  </form>
+</body>
+</html>
+
+
+File index.html
+
+<!DOCTYPE html>
+<html lang="en" ng-app="GacorAstroApp"  >
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <!-- ANGULAR JS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script src="../js/app.js"></script>
+    <script src="../js/logoutController.js"></script>
+    <script src="../js/mainController.js"></script>
+
+
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- ANIMASI CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+
+
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-light animate__animated animate__fadeInDown ">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">
+                <span class="text-white fs-1 fs-md-3 fs-lg-5">GacorAstro</span>
+            </a>
+            <button class="navbar-toggler bg-white shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto d-flex gap-4 text-center pt-lg-0 pt-4">
+                <li class="nav-item">
+                    <a class="nav-link active text-white"  href="#home">HOME</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link active text-white"  href="#zodiak">ZODIAK</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="#artikel">ARTIKEL</a>
+                </li>
+
+
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="#contact">CONTACT</a>
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="subscribe.html">SUBSCRIBE</a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="/account" class="nav-link text-white">ACCOUNT</a>
+
+                </li>
+                
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <!-- NAVBAR -->
+
+    <!-- SECTION -->
+    <section class="hero" id="home" ng-controller="MainController">
+        <div class="container">
+            <div class="hero-box d-flex align-items-center justify-content-between gap-md-0 gap-5 flex-md-row flex-column">
+                <div class="box animate__animated animate__fadeInLeft">
+                    <h1 class="fw-bold" id="welcome-message">
+                        WELCOME, {{ username || 'Guest' }}
+                    </h1>
+                    <h1>
+                        to
+                        <span>
+                            GacorAstro
+                        </span> 
+                    </h1>
+                    <h4>MUSIC - CULTURE - FASHION </h4>
+                    <p lh-lg mb-4>GacorAstro adalah Website gaya hidup yang membahas seputar Zodiak atau lebih dikenal
+                        Rasi Bintang. Dalam Website ini akan berisi ramalan dalam berbagai aspek
+                        yaitu, karakter, kesehatan, karier, hubungan sesuai dengan tanda Zodiak Pengguna.</p>
+                    <div>
+                        <a href="subscribe.html" class="btn btn-dark">
+                           Subscribe
+                        </a>
+                        <a href="#about" class="btn btn-outline-light">
+                            About Us
+                        </a>
+                    </div>
+                </div>
+
+                <div class="box animate__animated animate__fadeInRight animate__delay-2s">
+                    <img src="/images/gacor1.png" alt="Hero Image">
+                </div>
+            </div>
+        </div>
+        
+        <button ng-click="logout()" class="btn btn-danger" ng-controller="LogoutController">Logout</button>
+
+     </section>
+    <!-- SECTION -->
+
+</body>
+</html>
+
+
+File server.js
+
+const express = require('express');
+const session = require('express-session');
+const connectDB = require('./backend/config/db');
+const userRoutes = require('./backend/routes/userRoutes');
+require('dotenv').config();
+const path = require('path');
+const { isAuthenticated, isNotAuthenticated } = require('./backend/middleware/auth'); // Import middleware
+
+const app = express();
+
+// Koneksi ke database
+connectDB();
+
+// Middleware
+app.use(express.json());
+app.use(
+  session({
+    secret: 'your_secret_key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { 
+        secure: false,
+        maxAge: 1000 * 60 * 30, 
+    }, // Jangan lupa ubah ke true jika menggunakan HTTPS di produksi
+  })
+);
+app.use(express.static(path.join(__dirname, 'frontend')));
+
+// Rute Backend
+app.use('/api/users', userRoutes);
+
+
+
+// Halaman index (hanya untuk pengguna yang sudah login)
+app.get('/', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+});
+  
+app.get('/login', isNotAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'views', 'login.html'));
+});
+  
+app.get('/register', isNotAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'views', 'register.html'));
+});
+
+app.get("/account", isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "views", "account.html"));
+});
+  
+
+// Logout
+// Rute POST untuk logout
+app.post('/user/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.log('Error saat logout:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+  
+      res.clearCookie('connect.sid', {
+        path: '/', 
+        httpOnly: true, 
+        secure: false, 
+      }); // Hapus cookie sesi
+  
+      console.log('Logout berhasil, sesi dihancurkan');
+      res.status(200).json({ message: 'Logged out successfully' });
+    });
+  });
+  
+  
+
+// Jalankan server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

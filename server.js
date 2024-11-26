@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const connectDB = require('./backend/config/db');
 const userRoutes = require('./backend/routes/userRoutes');
+const reviewRoutes = require('./backend/routes/reviewRoutes');
 require('dotenv').config();
 const path = require('path');
 const { isAuthenticated, isNotAuthenticated } = require('./backend/middleware/auth'); // Import middleware
@@ -29,6 +30,7 @@ app.use(express.static(path.join(__dirname, 'frontend')));
 // Rute Backend
 app.use('/api/users', userRoutes);
 
+app.use('/api/reviews', reviewRoutes);
 
 
 // Halaman index (hanya untuk pengguna yang sudah login)
@@ -52,25 +54,31 @@ app.get("/account", isAuthenticated, (req, res) => {
 // Logout
 // Rute POST untuk logout
 app.post('/user/logout', (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.log('Error saat logout:', err);
-        return res.status(500).json({ message: 'Logout failed' });
-      }
-  
-      res.clearCookie('connect.sid', {
-        path: '/', 
-        httpOnly: true, 
-        secure: false, 
-      }); // Hapus cookie sesi
-  
-      console.log('Logout berhasil, sesi dihancurkan');
-      res.status(200).json({ message: 'Logged out successfully' });
-    });
+  if (!req.session.userId) {
+    return res.status(400).json({ message: 'No active session' });
+  }
+
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error during logout:', err);
+      return res.status(500).json({ message: 'Logout failed' });
+    }
+
+    res.clearCookie('connect.sid'); // Hapus cookie sesi
+    res.status(200).json({ message: 'Logged out successfully' });
   });
+});
+
   
   
 
 // Jalankan server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+
+// Error handler middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong' });
+});

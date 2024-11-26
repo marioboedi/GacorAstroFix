@@ -13,6 +13,7 @@
     <script src="../js/app.js"></script>
     <script src="../js/logoutController.js"></script>
     <script src="../js/mainController.js"></script>
+    <script src="../js/ReviewController.js"></script>
 
 
 
@@ -108,5 +109,30 @@
      </section>
     <!-- SECTION -->
 
+    <section id="reviews" ng-controller="ReviewController">
+        <h2>User Reviews</h2>
+      
+        <!-- Tambahkan Review -->
+        <form ng-submit="addReview()">
+          <textarea ng-model="newReview.content" placeholder="Write your review..." required></textarea>
+          <select ng-model="newReview.rating" required>
+            <option value="1">1 - Poor</option>
+            <option value="2">2 - Fair</option>
+            <option value="3">3 - Good</option>
+            <option value="4">4 - Very Good</option>
+            <option value="5">5 - Excellent</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+      
+        <!-- Daftar Review -->
+        <div ng-repeat="review in reviews" class="review-item">
+          <p><strong>{{ review.user.username }}</strong>: {{ review.content }}</p>
+          <p>Rating: {{ review.rating }}</p>
+          <button ng-if="review.user._id === currentUserId" ng-click="editReview(review)">Edit</button>
+          <button ng-if="review.username === username" ng-click="deleteReview(review._id)">Delete</button>
+        </div>
+      </section>
+      
 </body>
 </html>

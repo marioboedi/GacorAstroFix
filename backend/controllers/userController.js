@@ -4,14 +4,25 @@ const bcrypt = require('bcrypt');
 exports.register = async (req, res) => {
   const { username, password, email } = req.body;
   try {
+    // Validasi input
+    if (!username || !password || !email) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
     const userExists = await User.findOne({ username });
     if (userExists) return res.status(400).json({ message: 'Username already exists' });
 
-    const newUser = new User({ username, password, email });
+    const hashedPassword = await bcrypt.hash(password, 10); // Hash password
+    const newUser = new User({ username, password: hashedPassword, email });
     await newUser.save();
 
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
+    console.error('Error during registration:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -19,6 +30,10 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { username, password } = req.body;
   try {
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ message: 'Invalid username or password' });
 
@@ -27,101 +42,86 @@ exports.login = async (req, res) => {
 
     // Simpan sesi
     req.session.userId = user._id;
+    console.log('Session setelah login:', req.session);
 
     res.status(200).json({ message: 'Login successful' });
   } catch (error) {
+    console.error('Error during login:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-// backend/controllers/userController.js
 exports.logout = (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ message: 'Logout failed' });
-        }
-        res.clearCookie('connect.sid');
-        res.status(200).json({ message: 'Logged out successfully' });
-    });
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error during logout:', err);
+      return res.status(500).json({ message: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid');
+    res.status(200).json({ message: 'Logged out successfully' });
+  });
 };
-
 
 exports.updateUser = async (req, res) => {
   const userId = req.session.userId;
 
   if (!userId) {
-    return res.status(401).json({ message: "User not authenticated" });
+    return res.status(401).json({ message: 'User not authenticated' });
   }
 
   const updates = {};
-  if (req.body.username) updates.username = req.body.username; // Tambahkan jika username dikirim
-  if (req.body.email) updates.email = req.body.email;         // Tambahkan jika email dikirim
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ message: "No fields to update" });
+  if (req.body.username) updates.username = req.body.username;
+  if (req.body.email) {
+    if (!/^\S+@\S+\.\S+$/.test(req.body.email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    updates.email = req.body.email;
   }
 
   try {
-    const user = await User.findOneAndUpdate(
-      { _id: userId },
-      updates,
-      { new: true } // Mengembalikan data terbaru setelah update
-    );
+    const user = await User.findByIdAndUpdate(userId, updates, { new: true });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({ message: "User updated successfully", user });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error updating user" });
+    res.status(200).json({ message: 'User updated successfully', user });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Error updating user' });
   }
 };
 
 exports.deleteUser = async (req, res) => {
   const userId = req.session.userId;
 
-  console.log("Session UserID untuk delete:", userId);
-
   if (!userId) {
-    return res.status(401).json({ message: "User not authenticated" });
+    return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
     const deletedUser = await User.findByIdAndDelete(userId);
-    if (!deletedUser) {
-      console.log("User tidak ditemukan untuk delete");
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    console.log("User berhasil dihapus:", deletedUser);
+    if (!deletedUser) return res.status(404).json({ message: 'User not found' });
 
     req.session.destroy();
-    res.status(200).json({ message: "User deleted successfully" });
-  } catch (err) {
-    console.error("Error saat menghapus user:", err);
-    res.status(500).json({ message: "Error deleting user" });
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Error deleting user' });
   }
 };
 
-
 exports.getCurrentUser = async (req, res) => {
+  const userId = req.session.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'User not authenticated' });
+  }
+
   try {
-    const userId = req.session.userId;
-
-    if (!userId) {
-      return res.status(401).json({ message: "User not authenticated" });
-    }
-
-    const user = await User.findById(userId).select("username email"); // Mengambil username dan email
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await User.findById(userId).select('username email');
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.status(200).json({ user });
-  } catch (err) {
-    console.error("Error fetching user data:", err);
-    res.status(500).json({ message: "Error fetching user data" });
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ message: 'Error fetching user data' });
   }
 };
